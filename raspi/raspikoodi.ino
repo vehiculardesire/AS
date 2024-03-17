@@ -12,6 +12,11 @@ const int stepPinSweeper = 5;
 const int dirPinSweeper = 6;
 const int enablePinSweeper = 7;
 
+// maksimit venttiilille
+const long valveMinPosition = 0; 
+const long valveMaxPosition = 1000; 
+
+
 // PID Setup
 double Setpoint = 2.0; // default arvo pid:lle
 double Input, Output;
@@ -38,13 +43,17 @@ void setup() {
   myPID.SetOutputLimits(-50, 50); // pid:n  ulostusrajat
 
   // initiliaze stepper oliot
-  stepperValve.setMaxSpeed(60);
-  stepperValve.setAcceleration(20);
+  stepperValve.setMaxSpeed(20);
+  stepperValve.setAcceleration(10);
   stepperValve.setEnablePin(enablePinValve);
+  stepperValve.setCurrentPosition(0); // Assume valve is fully closed at startup
+
   
   stepperSweeper.setMaxSpeed(200); 
   stepperSweeper.setAcceleration(50);
   stepperSweeper.setEnablePin(enablePinSweeper);
+  
+
 
   // pistetään luukut poies
   stepperValve.disableOutputs();
@@ -59,10 +68,18 @@ void loop() {
   }
 
   if (myPID.Compute()) {
-    stepperValve.enableOutputs(); //pistetään päälle ennenkun mennään
-    stepperValve.move(Output); // ja sit menee
+    long newPosition = stepperValve.currentPosition() + Output;
+    newPosition = constrain(newPosition, valveMinPosition, valveMaxPosition);
+    
+    if (newPosition != stepperValve.currentPosition()) {
+      stepperValve.enableOutputs();
+      stepperValve.moveTo(newPosition); 
+	  Serial.print("Valve Position: ");
+	  Serial.println(stepperValve.currentPosition());
 
+    }
   }
+
     // Sweeper logiikka
   // liikkuu x suuntaa per millon on aika
 	if (millis() - lastSweepTime > sweepInterval) {
