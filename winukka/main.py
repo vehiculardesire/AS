@@ -1,6 +1,6 @@
 import sys
 from PySide2.QtWidgets import (QApplication, QWidget, QVBoxLayout, QPushButton, QInputDialog, QMessageBox, QLabel, )
-from PySide2.QtCore import  QThread, QObject, Signal
+from PySide2.QtCore import QTimer, QThread, QObject, Signal
 import serial
 from serial.tools import list_ports
 import fetch_csv
@@ -50,22 +50,26 @@ class StepperMotorControllerApp(QWidget):
         self.setLayout(layout)
 
     def start_sensor_data_worker(self):
-        self.thread = QThread()
+        self.timer = QTimer(self)
+        self.timer.timeout.connect(self.fetch_and_send_sensor_data)
+        self.timer.start(60000)  # 60 seconds interval
+
+    def fetch_and_send_sensor_data(self):
+        thread = QThread()
         worker = FetchSensorDataWorker('http://192.168.1.212/userfiles/Data0_logbook.csv')
-        worker.moveToThread(self.thread)
-        worker.finished.connect(self.thread.quit)
+        worker.moveToThread(thread)
+        worker.finished.connect(thread.quit)
         worker.update.connect(self.handle_sensor_data_update)
         worker.error.connect(self.handle_error)
-        self.thread.started.connect(worker.run)
-        self.thread.start()
+        thread.started.connect(worker.run)
+        thread.start()
 
+        #tilapäisesti ei tarkasta mitää mitä pistetään eteenpäin
     def handle_sensor_data_update(self, sensor_data):
-        sensor_type = sensor_data["sensor_type"]
+
         value = sensor_data["value"]
-        unit = sensor_data["unit"]
-        self.sensorData[sensor_type] = {"value": value, "unit": unit}
-        display_text = ", ".join([f"{k}: {v['value']:.2f} {v['unit']}" for k, v in self.sensorData.items()])
-        self.sensor_value_label.setText(display_text)
+        command = f"Sensor_Reading_DO {value}"
+        self.send_via_serial(command)
 
     def handle_error(self, error_message):
         QMessageBox.warning(self, "Error", error_message)
