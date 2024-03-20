@@ -3,24 +3,29 @@
 #include <PID_v1.h>
 
 // Stepper pinnit venttiilille
-const int stepPinValve = 2;
-const int dirPinValve = 3;
-const int enablePinValve = 4;
+const int enablePinValve = 2;
+const int stepPinValve = 3;
+const int dirPinValve = 4;
 
 // sama sweepperille
-const int stepPinSweeper = 5;
-const int dirPinSweeper = 6;
-const int enablePinSweeper = 7;
+const int enablePinSweeper =10;
+const int stepPinSweeper = 11;
+const int dirPinSweeper = 12;
 
 // maksimit venttiilille
 const long valveMinPosition = 0; 
-const long valveMaxPosition = 1000; 
+const long valveMaxPosition = 100; 
 
 
 // PID Setup
-double Setpoint = 2.0; // default arvo pid:lle
+double Setpoint = 0; // default arvo pid:lle
 double Input, Output;
-double Kp=2.0, Ki=5.0, Kd=1.0; // PID parametrit
+double Kp=0.6, Ki=0.3, Kd=0.7; // PID parametrit
+
+unsigned long lastPIDUpdateTime = 0; 
+const long pidUpdateInterval = 1000; 
+
+
 PID myPID(&Input, &Output, &Setpoint, Kp, Ki, Kd, DIRECT);
 
 AccelStepper stepperValve(AccelStepper::DRIVER, stepPinValve, dirPinValve);
@@ -34,28 +39,31 @@ const long sweepInterval = 300000; // intervalli millisekunteina millon pyyhitä
 bool sweeperDirection = true;    // sweeppering tän hetkinen suunta
 
 
-
 void setup() {
   Serial.begin(9600);
   inputString.reserve(200);
 
   myPID.SetMode(AUTOMATIC);
-  myPID.SetOutputLimits(-50, 50); // pid:n  ulostusrajat
+  myPID.SetOutputLimits(-5, 5); // pid:n  ulostusrajat
 
   // initiliaze stepper oliot
-  stepperValve.setMaxSpeed(20);
-  stepperValve.setAcceleration(10);
+  stepperValve.setMaxSpeed(10);
+  stepperValve.setAcceleration(1);
   stepperValve.setEnablePin(enablePinValve);
   stepperValve.setCurrentPosition(0); // Assume valve is fully closed at startup
-
   
-  stepperSweeper.setMaxSpeed(200); 
-  stepperSweeper.setAcceleration(50);
+  stepperSweeper.setMaxSpeed(100); 
+  stepperSweeper.setAcceleration(20);
   stepperSweeper.setEnablePin(enablePinSweeper);
-  
 
 
-  // pistetään luukut poies
+  stepperValve.setPinsInverted(false, false, true);
+  stepperSweeper.setPinsInverted(false, false, true);
+
+  stepperValve.setMinPulseWidth(200);
+  stepperSweeper.setMinPulseWidth(50);
+
+    // pistetään luukut poies
   stepperValve.disableOutputs();
   stepperSweeper.disableOutputs();
 }
@@ -67,17 +75,27 @@ void loop() {
     stringComplete = false;
   }
 
-  if (myPID.Compute()) {
-    long newPosition = stepperValve.currentPosition() + Output;
-    newPosition = constrain(newPosition, valveMinPosition, valveMaxPosition);
-    
-    if (newPosition != stepperValve.currentPosition()) {
-      stepperValve.enableOutputs();
-      stepperValve.moveTo(newPosition); 
-	  Serial.print("Valve Position: ");
-	  Serial.println(stepperValve.currentPosition());
+  unsigned long currentTime = millis();
+  if (currentTime - lastPIDUpdateTime >= pidUpdateInterval) {
+    lastPIDUpdateTime = currentTime;
 
+    if (myPID.Compute()) {
+      long newPosition = stepperValve.currentPosition() + Output;
+      newPosition = constrain(newPosition, valveMinPosition, valveMaxPosition);
+
+      Serial.print("Valve calc newPosition: ");
+      Serial.println(newPosition);
+
+      if (newPosition != stepperValve.currentPosition()) {
+        stepperValve.enableOutputs();
+
+        stepperValve.moveTo(newPosition); 
+      }
+      
+      Serial.print("Valve Position: ");
+      Serial.println(stepperValve.currentPosition());
     }
+    
   }
 
     // Sweeper logiikka
@@ -95,9 +113,13 @@ void loop() {
   stepperSweeper.disableOutputs(); 
   }
 
+  delay(1);
   stepperValve.run();
   stepperSweeper.run();
+
+  
 }
+
 void serialEvent() {
   while (Serial.available()) {
     char inChar = (char)Serial.read();
@@ -107,6 +129,9 @@ void serialEvent() {
     }
   }
 }
+
+
+
 
 void moveSweeper() {
   stepperSweeper.enableOutputs(); 
@@ -120,17 +145,39 @@ void moveSweeper() {
 }
 
 
-
 void parseCommand(String command) {
+  Serial.println("Received command: " + command); // Debug print for any command received
+  
   if (command.startsWith("Sensor_Reading_DO")) {
     String valueStr = command.substring(command.indexOf(' ') + 1);
     Input = valueStr.toDouble();
+    Serial.print("Received Sensor Reading: ");
+    Serial.println(Input);
+
   } else if (command.startsWith("Target_DO")) {
     String valueStr = command.substring(command.indexOf(' ') + 1);
     Setpoint = valueStr.toDouble();
+    Serial.print("Received Target DO: ");
+    Serial.println(Setpoint);
+
   } else if (command.startsWith("Force_Sweep")) {
+    Serial.println("Force Sweep Command Received");
     moveSweeper();
   }
-  // lisää tähän muut komennot
-}
 
+  else if (command.startsWith("Move_Valve")) {
+    // Extracting the number of steps from the command
+    String stepsStr = command.substring(command.indexOf(' ') + 1);
+    long steps = stepsStr.toInt();
+    long targetPosition = stepperValve.currentPosition() + steps;
+    
+    // Constrain the target position within the valve's min and max positions
+    targetPosition = constrain(targetPosition, valveMinPosition, valveMaxPosition);
+    
+    // Move the valve
+    stepperValve.enableOutputs();
+    stepperValve.moveTo(targetPosition);
+    Serial.print("Moving valve to position: ");
+    Serial.println(targetPosition);
+  }
+}
