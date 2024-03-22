@@ -178,13 +178,15 @@ void parseCommand(String command) {
     Serial.print("Received Sensor Reading: ");
     Serial.println(Input);
 
-  } else if (command.startsWith("Target_DO")) {
+  } 
+  else if (command.startsWith("Target_DO")) {
     String valueStr = command.substring(command.indexOf(' ') + 1);
     Setpoint = valueStr.toDouble();
     Serial.print("Received Target DO: ");
     Serial.println(Setpoint);
 
-  } else if (command.startsWith("Force_Sweep")) {
+  } 
+  else if (command.startsWith("Force_Sweep")) {
     Serial.println("Force Sweep Command Received");
     moveSweeper();
   }
