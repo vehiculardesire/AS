@@ -209,7 +209,21 @@ class StepperMotorControllerApp(QWidget):
         if not pixmap.isNull():  # Check if the pixmap was loaded successfully
             image_label = QLabel()
             image_label.setPixmap(pixmap.scaled(400, 200, Qt.KeepAspectRatio, Qt.SmoothTransformation))
-            layout.addWidget(image_label, 9, 0, 1, 2, Qt.AlignCenter)
+
+            # Create a QLabel for the sponsor text
+            sponsor_label = QLabel("Sponsor")
+            sponsor_label.setAlignment(Qt.AlignCenter)
+
+            # Create a QVBoxLayout to stack the sponsor label and the image
+            sponsor_layout = QVBoxLayout()
+            sponsor_layout.addWidget(sponsor_label)
+            sponsor_layout.addWidget(image_label)
+
+            # Create a QWidget to hold the layout and add it to the main layout
+            sponsor_widget = QWidget()
+            sponsor_widget.setLayout(sponsor_layout)
+            layout.addWidget(sponsor_widget, 9, 0, 1, 2, Qt.AlignCenter)
+
         else:
             print("Error: Image not loaded correctly. Please check the file path.")
      # Set the layout to the QWidget
