@@ -2,8 +2,22 @@ import requests
 from io import StringIO
 import pandas as pd
 
-
 def fetch_sensor_data(url):
+    """
+    Fetches sensor data from a CSV file located at the given URL.
+
+    Args:
+        url (str): The URL of the CSV file.
+
+    Returns:
+        dict or None: A dictionary containing the sensor type, sensor value, and unit of measurement.
+                      Returns None if an error occurs during the data retrieval.
+
+    Raises:
+        requests.HTTPError: If an HTTP error occurs while fetching the CSV file.
+        ValueError: If there is an error in parsing the CSV data.
+        Exception: If any other error occurs during the data retrieval.
+    """
     try:
         response = requests.get(url)
         response.raise_for_status()
