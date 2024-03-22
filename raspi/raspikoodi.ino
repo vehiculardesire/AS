@@ -25,6 +25,14 @@ double Kp=0.6, Ki=0.3, Kd=0.7; // PID parametrit
 unsigned long lastPIDUpdateTime = 0; 
 const long pidUpdateInterval = 1000; 
 
+// POwer managementtia
+bool valveMovementFinished = false;
+bool sweeperMovementFinished = false;
+unsigned long valvePowerOffTime = 0;
+unsigned long sweeperPowerOffTime = 0;
+const unsigned long powerOffDelay = 1000; // 1 s
+
+
 
 PID myPID(&Input, &Output, &Setpoint, Kp, Ki, Kd, DIRECT);
 
@@ -47,8 +55,8 @@ void setup() {
   myPID.SetOutputLimits(-5, 5); // pid:n  ulostusrajat
 
   // initiliaze stepper oliot
-  stepperValve.setMaxSpeed(10);
-  stepperValve.setAcceleration(1);
+  stepperValve.setMaxSpeed(20);
+  stepperValve.setAcceleration(5);
   stepperValve.setEnablePin(enablePinValve);
   stepperValve.setCurrentPosition(0); // Assume valve is fully closed at startup
   
@@ -88,7 +96,6 @@ void loop() {
 
       if (newPosition != stepperValve.currentPosition()) {
         stepperValve.enableOutputs();
-
         stepperValve.moveTo(newPosition); 
       }
       
@@ -104,20 +111,36 @@ void loop() {
 		moveSweeper();
   }
 
-  // checkkaa nopee jos mitää ei tapahdu = virrat poies
-  if (!stepperValve.isRunning()) {
-    stepperValve.disableOutputs();
-  }
-  
-  if (!stepperSweeper.isRunning()) {
-  stepperSweeper.disableOutputs(); 
-  }
-
-  delay(1);
   stepperValve.run();
   stepperSweeper.run();
 
-  
+  // Aikaisemmin skripti otti liian nopee virrat pois steppereiltä, tää sallii niiden olla 1 s pidempään päällä varuiks ilman delay:tä
+
+  if (stepperValve.distanceToGo() == 0) { // Check if stepperValve has reached the target
+    if (!valveMovementFinished) { // Initial detection
+      valveMovementFinished = true;
+      valvePowerOffTime = millis(); // Mark the time when it first reached the position
+    } else if ((millis() - valvePowerOffTime >= powerOffDelay) && valveMovementFinished) {
+      stepperValve.disableOutputs(); // Disable outputs after delay
+      valveMovementFinished = false;
+    }
+  } else {
+    valveMovementFinished = false; // Reset if the stepper moves again
+  }
+
+  // Apply similar logic for the sweeper stepper
+  if (stepperSweeper.distanceToGo() == 0) {
+    if (!sweeperMovementFinished) {
+      sweeperMovementFinished = true;
+      sweeperPowerOffTime = millis();
+    } else if ((millis() - sweeperPowerOffTime >= powerOffDelay) && sweeperMovementFinished) {
+      stepperSweeper.disableOutputs();
+      sweeperMovementFinished = false;
+    }
+  } else {
+    sweeperMovementFinished = false; // Reset if the stepper moves again
+  }
+    
 }
 
 void serialEvent() {
@@ -140,13 +163,14 @@ void moveSweeper() {
   } else {
     stepperSweeper.move(-1000); // ja vasemmalle
   }
-  sweeperDirection = !sweeperDirection; // vaihta suuntaa
+  sweeperDirection = !sweeperDirection; // vaihtaa suuntaa
   lastSweepTime = millis(); 
 }
 
 
 void parseCommand(String command) {
-  Serial.println("Received command: " + command); // Debug print for any command received
+
+  Serial.println("Received command: " + command); //debug print
   
   if (command.startsWith("Sensor_Reading_DO")) {
     String valueStr = command.substring(command.indexOf(' ') + 1);
@@ -166,15 +190,12 @@ void parseCommand(String command) {
   }
 
   else if (command.startsWith("Move_Valve")) {
-    // Extracting the number of steps from the command
     String stepsStr = command.substring(command.indexOf(' ') + 1);
     long steps = stepsStr.toInt();
     long targetPosition = stepperValve.currentPosition() + steps;
     
-    // Constrain the target position within the valve's min and max positions
     targetPosition = constrain(targetPosition, valveMinPosition, valveMaxPosition);
     
-    // Move the valve
     stepperValve.enableOutputs();
     stepperValve.moveTo(targetPosition);
     Serial.print("Moving valve to position: ");
