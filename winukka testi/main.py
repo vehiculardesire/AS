@@ -10,8 +10,8 @@ from datetime import datetime
 import os
 
 
-# tenperatre , 
-SENSOR_URLS = ["http://192.168.1.212/userfiles/Data0_logbook.csv", "http://192.168.1.212/userfiles/Data2_logbook.csv" ]
+# tenperatre , ph
+SENSOR_URLS = ["http://192.168.1.212/userfiles/Data0_logbook.csv", "http://192.168.1.212/userfiles/Data1_logbook.csv" ]
 
 class FetchSensorDataWorker(QObject):
     finished = Signal()
@@ -20,12 +20,12 @@ class FetchSensorDataWorker(QObject):
 
     def __init__(self, url, ser):
         super().__init__()
-        self.url = url
+        self.url = SENSOR_URLS[0]
         self.ser = ser
 
     def fetch_data(self):
         try:
-            result = fetch_csv.fetch_sensor_data_mock(self.url)  # Use the mock function
+            result = fetch_csv.fetch_sensor_data("http://192.168.1.212/userfiles/Data0_logbook.csv")  # Use the mock function
             if result:
                 # Directly access the values from the dictionary
                 sensor_type = result['sensor_type']
@@ -36,7 +36,7 @@ class FetchSensorDataWorker(QObject):
                 self.update.emit({"sensor_type": sensor_type, "value": value, "unit": unit})
                 
                 # Prepare and send the command via serial
-                command = f"Sensor_Reading_DO {value}"
+                command = f"Sensor_Reading_DO {value/10}"
                 self.send_via_serial(command)
             else:
                 self.error.emit("Failed to fetch data")
@@ -54,7 +54,7 @@ class FetchSensorDataWorker(QObject):
     def run(self):
         self.timer = QTimer()
         self.timer.timeout.connect(self.fetch_data)
-        self.timer.start(60000)  # 60 seconds interval
+        self.timer.start(6000)  # 60 seconds interval
         self.fetch_data()
 
 
@@ -90,17 +90,20 @@ class LogSensorDataWorker(QObject):
 
     def __init__(self, urls):
         super().__init__()
-        self.urls = urls
+        self.urls = SENSOR_URLS
         self.timer = QTimer()
         self.timer.timeout.connect(self.log_data)
-        self.timer.start(600000)  # 10 minutes interval
+        self.timer.start(30000)  # 30 seconds interval
         
     def log_data(self):
         for url in self.urls:
             try:
                 result = fetch_csv.fetch_sensor_data(url)
                 if result:
-                    sensor_type, value, unit = result
+                    sensor_type = result.get("sensor_type", "Unknown")
+                    value = result.get("value", 0)
+                    unit = result.get("unit", "Unknown")
+                    print(f"fetched Logging data: {sensor_type}, {value}, {unit}")
                     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                     filename = f"{sensor_type}.csv"
                     file_exists = os.path.isfile(filename)
@@ -114,7 +117,34 @@ class LogSensorDataWorker(QObject):
             except Exception as e:
                 self.error.emit(str(e))
 
+    def run(self):
+        print("Running the background task")
 
+
+class SerialCommandsWindow(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.initUI()
+
+    def initUI(self):
+        self.setWindowTitle("Available Serial Commands")
+        self.setGeometry(100, 100, 400, 300)  # Adjust size as needed
+        layout = QVBoxLayout()
+
+        # Define your commands and descriptions
+        commands = [
+            "Sensor_Reading_DO <value>: Send sensor reading with value.",
+            "Target_DO <value>: Set target dissolved oxygen to <value>.",
+            "Force_Sweep: Initiate a sweep action.",
+            "Move_Valve <steps>: Move the valve a certain number of steps.",
+            "Set_Valve_Min_Position <position>: Set the minimum position for the valve."
+        ]
+
+        # Create and add labels for each command
+        for command in commands:
+            layout.addWidget(QLabel(command))
+
+        self.setLayout(layout)
 
 
 class StepperMotorControllerApp(QWidget):
@@ -193,15 +223,24 @@ class StepperMotorControllerApp(QWidget):
         self.command_input = QLineEdit()
         self.command_input.returnPressed.connect(self.send_command)
         layout.addWidget(self.command_input, 6, 0, 1, 2)
+        
         self.start_button = QPushButton('Start Fetching Sensor Data')
         self.start_button.clicked.connect(self.start_sensor_data_worker)
         layout.addWidget(self.start_button, 7, 0)
+        
         self.force_sweep_button = QPushButton('Force Sweep')
         self.force_sweep_button.clicked.connect(lambda: self.send_via_serial("Force_Sweep"))
         layout.addWidget(self.force_sweep_button, 7, 1)
+        
         self.log_data_button = QPushButton('Start Logging Sensor Data')
         self.log_data_button.clicked.connect(self.toggle_log_data_worker)
-        layout.addWidget(self.log_data_button, 8, 0, 1, 2)
+        layout.addWidget(self.log_data_button, 8, 0)
+    
+        
+        self.show_serial_commands_button = QPushButton('Show Serial Commands')
+        self.show_serial_commands_button.clicked.connect(self.show_serial_commands_window)
+        layout.addWidget(self.show_serial_commands_button, 8, 1)
+        
 
         # Load and display the company logo
         image_path = "./endress-hauser-logo.png"
@@ -228,6 +267,10 @@ class StepperMotorControllerApp(QWidget):
             print("Error: Image not loaded correctly. Please check the file path.")
      # Set the layout to the QWidget
         self.setLayout(layout)
+        
+    def show_serial_commands_window(self):
+        self.commands_window = SerialCommandsWindow()
+        self.commands_window.show()
         
     def open_serial_connection(self):
         try:
