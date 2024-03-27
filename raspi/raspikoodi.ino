@@ -14,13 +14,13 @@ const int dirPinSweeper = 12;
 
 // maksimit venttiilille
 const long valveMinPosition = 0; 
-const long valveMaxPosition = 100; 
+const long valveMaxPosition = 600; 
 
 
 // PID Setup
 double Setpoint = 0; // default arvo pid:lle
 double Input, Output;
-double Kp=0.6, Ki=0.3, Kd=0.7; // PID parametrit
+double Kp=300, Ki=0, Kd=10; // PID parametrit
 
 unsigned long lastPIDUpdateTime = 0; 
 const long pidUpdateInterval = 1000; 
@@ -40,7 +40,7 @@ AccelStepper stepperValve(AccelStepper::DRIVER, stepPinValve, dirPinValve);
 AccelStepper stepperSweeper(AccelStepper::DRIVER, stepPinSweeper, dirPinSweeper);
 
 String inputString = "";         
-bool stringComplete = false;     
+bool stringComplete = true;     
 
 unsigned long lastSweepTime = 0; 
 const long sweepInterval = 300000; // intervalli millisekunteina millon pyyhitään (5m= 300000)
@@ -159,9 +159,9 @@ void serialEvent() {
 void moveSweeper() {
   stepperSweeper.enableOutputs(); 
   if (sweeperDirection) {
-    stepperSweeper.move(1000); // liikutaan oikealla
+    stepperSweeper.move(2960); // liikutaan oikealla
   } else {
-    stepperSweeper.move(-1000); // ja vasemmalle
+    stepperSweeper.move(-2960); // ja vasemmalle
   }
   sweeperDirection = !sweeperDirection; // vaihtaa suuntaa
   lastSweepTime = millis(); 
@@ -202,5 +202,13 @@ void parseCommand(String command) {
     stepperValve.moveTo(targetPosition);
     Serial.print("Moving valve to position: ");
     Serial.println(targetPosition);
+  }
+  
+  else if (command.startsWith("Set_Valve_Min_Position")) {
+      String valueStr = command.substring(command.indexOf(' ') + 1);
+      long newMinPosition = valueStr.toInt();
+      valveMinPosition = newMinPosition;
+      Serial.print("New valve minimum position set to: ");
+      Serial.println(valveMinPosition);
   }
 }
