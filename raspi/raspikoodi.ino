@@ -13,14 +13,14 @@ const int stepPinSweeper = 11;
 const int dirPinSweeper = 12;
 
 // maksimit venttiilille
-const long valveMinPosition = 0; 
-const long valveMaxPosition = 600; 
+long valveMinPosition = -100; 
+const long valveMaxPosition = 300; 
 
 
 // PID Setup
 double Setpoint = 0; // default arvo pid:lle
 double Input, Output;
-double Kp=300, Ki=0, Kd=10; // PID parametrit
+double Kp=30, Ki=0, Kd=10; // PID parametrit
 
 unsigned long lastPIDUpdateTime = 0; 
 const long pidUpdateInterval = 1000; 
@@ -159,9 +159,9 @@ void serialEvent() {
 void moveSweeper() {
   stepperSweeper.enableOutputs(); 
   if (sweeperDirection) {
-    stepperSweeper.move(2960); // liikutaan oikealla
+    stepperSweeper.move(3145); // liikutaan oikealla
   } else {
-    stepperSweeper.move(-2960); // ja vasemmalle
+    stepperSweeper.move(-3145); // ja vasemmalle
   }
   sweeperDirection = !sweeperDirection; // vaihtaa suuntaa
   lastSweepTime = millis(); 
