@@ -25,7 +25,7 @@ class FetchSensorDataWorker(QObject):
 
     def fetch_data(self):
         try:
-            result = fetch_csv.fetch_sensor_data("http://192.168.1.212/userfiles/Data0_logbook.csv")  # Use the mock function
+            result = fetch_csv.fetch_sensor_data_mock("http://192.168.1.212/userfiles/Data0_logbook.csv")  # Use the mock function
             if result:
                 # Directly access the values from the dictionary
                 sensor_type = result['sensor_type']
@@ -36,7 +36,7 @@ class FetchSensorDataWorker(QObject):
                 self.update.emit({"sensor_type": sensor_type, "value": value, "unit": unit})
                 
                 # Prepare and send the command via serial
-                command = f"Sensor_Reading_DO {value/10}"
+                command = f"Sensor_Reading_DO {value}"
                 self.send_via_serial(command)
             else:
                 self.error.emit("Failed to fetch data")
