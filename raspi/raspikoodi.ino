@@ -13,8 +13,8 @@ const int stepPinSweeper = 11;
 const int dirPinSweeper = 12;
 
 // maksimit venttiilille
-long valveMinPosition = -100; 
-const long valveMaxPosition = 300; 
+long valveMinPosition = -50; 
+const long valveMaxPosition = 200; 
 
 
 // PID Setup
@@ -58,7 +58,7 @@ void setup() {
   stepperValve.setMaxSpeed(20);
   stepperValve.setAcceleration(5);
   stepperValve.setEnablePin(enablePinValve);
-  stepperValve.setCurrentPosition(0); // Assume valve is fully closed at startup
+  stepperValve.setCurrentPosition(0); // oletetaan et rotari on täysin kiinni käynnistettäessä/ tätä alemmaks ei mennä
   
   stepperSweeper.setMaxSpeed(100); 
   stepperSweeper.setAcceleration(20);
@@ -116,29 +116,30 @@ void loop() {
 
   // Aikaisemmin skripti otti liian nopee virrat pois steppereiltä, tää sallii niiden olla 1 s pidempään päällä varuiks ilman delay:tä
 
-  if (stepperValve.distanceToGo() == 0) { // Check if stepperValve has reached the target
-    if (!valveMovementFinished) { // Initial detection
+  if (stepperValve.distanceToGo() == 0) { 
+    if (!valveMovementFinished) { 
       valveMovementFinished = true;
-      valvePowerOffTime = millis(); // Mark the time when it first reached the position
+      valvePowerOffTime = millis(); 
     } else if ((millis() - valvePowerOffTime >= powerOffDelay) && valveMovementFinished) {
-      stepperValve.disableOutputs(); // Disable outputs after delay
+      stepperValve.disableOutputs(); 
       valveMovementFinished = false;
     }
   } else {
-    valveMovementFinished = false; // Reset if the stepper moves again
+    valveMovementFinished = false; /
   }
 
-  // Apply similar logic for the sweeper stepper
+ 
   if (stepperSweeper.distanceToGo() == 0) {
     if (!sweeperMovementFinished) {
       sweeperMovementFinished = true;
       sweeperPowerOffTime = millis();
-    } else if ((millis() - sweeperPowerOffTime >= powerOffDelay) && sweeperMovementFinished) {
+    } 
+	else if ((millis() - sweeperPowerOffTime >= powerOffDelay) && sweeperMovementFinished) {
       stepperSweeper.disableOutputs();
       sweeperMovementFinished = false;
     }
   } else {
-    sweeperMovementFinished = false; // Reset if the stepper moves again
+    sweeperMovementFinished = false; 
   }
     
 }
